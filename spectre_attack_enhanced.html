@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spectre Attack — Interactive Demo</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2333; --bg4: #21262d;
+    --red: #e63946; --cyan: #00d4ff; --green: #2ea44f; --yellow: #f0a500;
+    --white: #f0f6fc; --muted: #8b949e; --border: #2d333b;
+    --purple: #8b5cf6; --orange: #f97316;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--white); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  header { background: var(--bg2); border-bottom: 2px solid var(--red); padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-family: Consolas, monospace; font-size: 1.5rem; color: var(--white); }
+  header span.badge { background: var(--red); color: var(--bg); font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; font-family: Consolas, monospace; }
+  nav { display: flex; gap: 0; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 2rem; overflow-x: auto; }
+  nav button { background: none; border: none; color: var(--muted); padding: 0.75rem 1.2rem; cursor: pointer; font-size: 0.85rem; font-family: Consolas, monospace; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }
+  nav button.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  nav button:hover { color: var(--white); }
+  .tab { display: none; padding: 2rem; max-width: 1060px; margin: 0 auto; }
+  .tab.active { display: block; }
+  h2 { font-family: Consolas, monospace; color: var(--cyan); margin-bottom: 0.5rem; font-size: 1.2rem; }
+  p { color: var(--muted); line-height: 1.6; margin-bottom: 1rem; font-size: 0.9rem; }
+  .card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card-red { border-left: 3px solid var(--red); }
+  .card-cyan { border-left: 3px solid var(--cyan); }
+  .card-green { border-left: 3px solid var(--green); }
+  .card-yellow { border-left: 3px solid var(--yellow); }
+  .card-purple { border-left: 3px solid var(--purple); }
+  .card-orange { border-left: 3px solid var(--orange); }
+  button.btn { background: var(--cyan); color: var(--bg); border: none; padding: 0.6rem 1.4rem; border-radius: 6px; cursor: pointer; font-family: Consolas, monospace; font-weight: 700; font-size: 0.85rem; transition: opacity .2s; }
+  button.btn:hover { opacity: 0.85; }
+  button.btn-red { background: var(--red); color: #fff; }
+  button.btn-yellow { background: var(--yellow); color: var(--bg); }
+  button.btn-green { background: var(--green); color: #fff; }
+  button.btn-purple { background: var(--purple); color: #fff; }
+  code, .code { font-family: Consolas, monospace; font-size: 0.82rem; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.8rem; line-height: 1.6; margin-bottom: 1rem; }
+  .highlight { color: var(--red); }
+  .comment  { color: var(--muted); }
+  .kw       { color: var(--cyan); }
+  .str      { color: var(--green); }
+  .num      { color: var(--yellow); }
+  /* Demo 1 – Cache timing */
+  #timingBars { display: flex; align-items: flex-end; gap: 2px; height: 120px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 1rem; }
+  .bar { flex: 1; border-radius: 2px 2px 0 0; transition: height .3s; min-width: 4px; }
+  #timingLog { margin-top: 1rem; font-family: Consolas, monospace; font-size: 0.78rem; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; height: 120px; overflow-y: auto; }
+  /* Demo 2 – Branch predictor */
+  #branchViz { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+  .train-step { background: var(--bg4); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 1rem; font-family: Consolas, monospace; font-size: 0.8rem; opacity: 0.4; transition: all .3s; text-align: center; }
+  .train-step.done { opacity: 1; border-color: var(--green); color: var(--green); }
+  .train-step.active { opacity: 1; border-color: var(--yellow); color: var(--yellow); transform: scale(1.05); }
+  .train-step.attack { opacity: 1; border-color: var(--red); color: var(--red); }
+  #predictorBar { height: 16px; background: var(--border); border-radius: 8px; overflow: hidden; margin-top: 1rem; }
+  #predictorFill { height: 100%; width: 0%; background: var(--green); transition: width .3s; border-radius: 8px; }
+  #branchLog { margin-top: 1rem; font-family: Consolas, monospace; font-size: 0.78rem; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; height: 100px; overflow-y: auto; }
+  /* Demo 3 – Probe scan */
+  #probeGrid { display: grid; grid-template-columns: repeat(32, 1fr); gap: 2px; margin-top: 1rem; }
+  .probe-cell { height: 22px; background: var(--bg4); border-radius: 2px; transition: background .15s; font-size: 0; cursor: pointer; position: relative; }
+  .probe-cell:hover::after { content: attr(data-val); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--bg3); color: var(--white); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-family: Consolas, monospace; white-space: nowrap; z-index: 10; }
+  .probe-cell.hot { background: var(--red); }
+  .probe-cell.warm { background: var(--yellow); }
+  .probe-cell.cold { background: #1e3a4a; }
+  #probeResult { margin-top: 1rem; text-align: center; font-family: Consolas, monospace; font-size: 1.5rem; }
+  /* stats row */
+  .stats { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .stat-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1.25rem; flex: 1; min-width: 120px; }
+  .stat-val { font-family: Consolas, monospace; font-size: 1.4rem; font-weight: 700; }
+  .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  /* step list */
+  ol.steps { padding-left: 1.5rem; }
+  ol.steps li { margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--white); }
+  ol.steps li span { color: var(--muted); }
+  footer { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+
+  /* ── HP Analogy Section ── */
+  .hp-scene { display: flex; gap: 1.5rem; align-items: flex-start; background: linear-gradient(135deg, #0f0c29, #1a1a3e, #24243e); border: 1px solid #4a3f8a; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.2rem; }
+  .hp-scene svg { flex-shrink: 0; }
+  .hp-bubble { flex: 1; }
+  .hp-bubble h3 { font-family: Consolas, monospace; color: #c084fc; font-size: 1rem; margin-bottom: 0.5rem; }
+  .hp-bubble p { color: var(--white); font-size: 0.9rem; margin-bottom: 0; }
+  .hp-bubble .tech-map { background: rgba(0,0,0,0.3); border-left: 3px solid #c084fc; padding: 0.6rem 0.8rem; border-radius: 0 6px 6px 0; margin-top: 0.6rem; font-size: 0.8rem; color: #e0d4fc; font-family: Consolas, monospace; }
+  .speech-bubble { position: relative; background: #1e1b4b; border: 1px solid #6d28d9; border-radius: 10px; padding: 0.6rem 0.8rem; margin-top: 0.5rem; font-size: 0.8rem; color: #ddd6fe; }
+  .speech-bubble::before { content: ''; position: absolute; left: -10px; top: 14px; border: 5px solid transparent; border-right-color: #6d28d9; }
+
+  /* ── AI/ML Section ── */
+  .aiml-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.2rem; }
+  @media(max-width:640px) { .aiml-grid { grid-template-columns: 1fr; } .hp-scene { flex-direction: column; } }
+  .aiml-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; position: relative; overflow: hidden; }
+  .aiml-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .aiml-card.lstm::before { background: linear-gradient(90deg, #06b6d4, #3b82f6); }
+  .aiml-card.nlp::before { background: linear-gradient(90deg, #8b5cf6, #ec4899); }
+  .aiml-card.rl::before { background: linear-gradient(90deg, #10b981, #06b6d4); }
+  .aiml-card.gnn::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+  .aiml-card h3 { font-family: Consolas, monospace; font-size: 0.95rem; margin-bottom: 0.4rem; }
+  .aiml-card .tag { display: inline-block; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 3px; font-family: Consolas, monospace; font-weight: 700; margin-bottom: 0.5rem; }
+  .aiml-card p { font-size: 0.82rem; color: var(--muted); margin-bottom: 0; }
+  .pipeline { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+  .pipe-step { background: var(--bg4); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.8rem; font-size: 0.78rem; font-family: Consolas, monospace; text-align: center; }
+  .pipe-arrow { color: var(--cyan); font-size: 1.2rem; }
+
+.memory-panel {
+  margin-top: 1.5rem;
+}
+
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 4px;
+  margin-top: 1rem;
+}
+
+.memory-cell {
+  aspect-ratio: 1;
+  background: #1c2333;
+  border: 1px solid #2d333b;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-family: Consolas, monospace;
+  color: #8b949e;
+  transition: all .25s ease;
+}
+
+.memory-cell.hit {
+  background: #e63946;
+  color: white;
+  box-shadow: 0 0 10px rgba(230,57,70,.7);
+}
+
+.memory-cell.speculative {
+  background: #f0a500;
+  color: #000;
+}
+
+.memory-cell.victim {
+  background: #2ea44f;
+  color: white;
+}
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .85rem;
+  color: #8b949e;
+}
+
+.legend-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div style="width:28px;height:28px;background:var(--red);clip-path:polygon(50% 0%,100% 100%,0% 100%);"></div>
+  <h1>SPECTRE ATTACK</h1>
+  <span class="badge">CVE-2017-5753</span>
+  <span style="color:var(--muted);font-size:0.8rem;margin-left:auto;">Interactive Demo — Educational Use Only</span>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('theory')">📖 Theory</button>
+  <button onclick="showTab('analogy')">🧙 HP Analogy</button>
+  <button onclick="showTab('demo1')">⏱ Demo 1: Cache Timing</button>
+  <button onclick="showTab('demo2')">🧠 Demo 2: Branch Training</button>
+  <button onclick="showTab('demo3')">🔍 Demo 3: Probe Scan</button>
+  <button onclick="showTab('code')">💻 Full PoC Code</button>
+  <button onclick="showTab('aiml')">🤖 AI/ML Solution</button>
+</nav>
+
+<!-- ══════════════════════ THEORY TAB ══════════════════════ -->
+<div id="tab-theory" class="tab active">
+  <h2>Spectre Attack — How It Works</h2>
+  <p>Spectre is a microarchitectural side-channel attack that exploits speculative execution to leak secrets from memory that a program should not be able to access.</p>
+
+  <div class="stats">
+    <div class="stat-box"><div class="stat-val" style="color:var(--red)">~3B</div><div class="stat-label">Devices Affected</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--yellow)">20+ yrs</div><div class="stat-label">CPU Generations</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--cyan)">3</div><div class="stat-label">Major Vendors</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--green)">2018</div><div class="stat-label">Public Disclosure</div></div>
+  </div>
+
+  <div class="card card-cyan">
+    <h2>The Attack Pipeline</h2>
+    <ol class="steps" style="margin-top:0.75rem;">
+      <li><strong>Mistrain the branch predictor</strong> <span>— repeatedly call a function with safe inputs so the CPU predicts the branch will always succeed.</span></li>
+      <li><strong>Flush target memory from cache</strong> <span>— use CLFLUSH (or equivalent) to evict the bounds variable so its check takes longer to resolve.</span></li>
+      <li><strong>Trigger speculative execution</strong> <span>— pass an out-of-bounds index; the CPU speculatively executes the "safe" body while the bounds check is pending.</span></li>
+      <li><strong>Secret is accessed speculatively</strong> <span>— the CPU reads memory[secret_offset] and uses it to index a probe array, loading that entry into cache.</span></li>
+      <li><strong>CPU detects the misprediction, rolls back</strong> <span>— architectural state is reverted, but the cache is not — the footprint remains.</span></li>
+      <li><strong>Time each probe array entry</strong> <span>— the entry that was cached is accessed in ~5 ns; others take ~100 ns. The fast index = the secret byte.</span></li>
+    </ol>
+  </div>
+
+  <div class="card card-red">
+    <h2>Why the Cache Stays Polluted</h2>
+    <p style="margin:0.5rem 0 0">When the CPU rolls back a mis-speculated path, it reverses <em>architectural</em> state (registers, memory writes) but does <strong style="color:var(--red)">not flush the cache</strong>. This is by design — flushing the cache on every rollback would destroy performance. This is the fundamental side-channel Spectre exploits.</p>
+  </div>
+
+  <div class="card card-yellow">
+    <h2>What Can Be Stolen?</h2>
+    <p style="margin:0.5rem 0 0">Private encryption keys • Passwords in memory • Browser session tokens • Kernel memory • Cross-VM data in cloud environments • Any data co-located in memory</p>
+  </div>
+
+  <p style="margin-top:1rem;font-size:0.85rem;color:var(--cyan);">💡 Follow the tabs in order: <strong>🧙 HP Analogy</strong> → run the <strong>demos as the attacker</strong> → see the <strong>💻 PoC Code</strong> → then discover the <strong>🤖 AI/ML Solution</strong> at the end.</p>
+</div>
+
+<!-- ══════════════════════ HP ANALOGY TAB ══════════════════════ -->
+<div id="tab-analogy" class="tab">
+  <h2>🧙 Hermione & Prof. Snape — Understanding Spectre</h2>
+  <p>Spectre's abstract CPU concepts become crystal-clear through a Hogwarts classroom analogy. Each character and action maps directly to a real CPU behaviour.</p>
+
+  <!-- Scene 1: Hermione = Speculative Execution -->
+  <div class="hp-scene">
+    <!-- Hermione SVG -->
+    <svg width="110" height="160" viewBox="0 0 110 160" xmlns="http://www.w3.org/2000/svg">
+      <!-- robe -->
+      <ellipse cx="55" cy="130" rx="38" ry="32" fill="#1a1a2e"/>
+      <rect x="30" y="100" width="50" height="55" rx="8" fill="#1a1a2e"/>
+      <!-- house tie stripes -->
+      <rect x="49" y="102" width="12" height="4" rx="1" fill="#e63946"/>
+      <rect x="49" y="108" width="12" height="4" rx="1" fill="#f0a500"/>
+      <rect x="49" y="114" width="12" height="4" rx="1" fill="#e63946"/>
+      <!-- collar -->
+      <polygon points="49,100 61,100 55,112" fill="#f0f6fc" opacity="0.9"/>
+      <!-- neck -->
+      <rect x="50" y="88" width="10" height="16" rx="4" fill="#f5c5a0"/>
+      <!-- head -->
+      <ellipse cx="55" cy="76" rx="22" ry="24" fill="#f5c5a0"/>
+      <!-- bushy hair -->
+      <ellipse cx="55" cy="57" rx="28" ry="16" fill="#5c3d1e"/>
+      <ellipse cx="30" cy="72" rx="10" ry="18" fill="#5c3d1e"/>
+      <ellipse cx="80" cy="72" rx="10" ry="18" fill="#5c3d1e"/>
+      <ellipse cx="55" cy="52" rx="22" ry="10" fill="#7a5230"/>
+      <!-- eyes -->
+      <ellipse cx="47" cy="74" rx="4" ry="4.5" fill="white"/>
+      <ellipse cx="63" cy="74" rx="4" ry="4.5" fill="white"/>
+      <circle cx="47" cy="75" r="2.5" fill="#3b2407"/>
+      <circle cx="63" cy="75" r="2.5" fill="#3b2407"/>
+      <circle cx="48" cy="74" r="1" fill="white"/>
+      <circle cx="64" cy="74" r="1" fill="white"/>
+      <!-- eyebrows -->
+      <path d="M43 69 Q47 67 51 69" stroke="#3b2407" stroke-width="1.5" fill="none"/>
+      <path d="M59 69 Q63 67 67 69" stroke="#3b2407" stroke-width="1.5" fill="none"/>
+      <!-- nose -->
+      <ellipse cx="55" cy="80" rx="2" ry="1.5" fill="#e0a882"/>
+      <!-- mouth — eager smile -->
+      <path d="M48 86 Q55 92 62 86" stroke="#a0522d" stroke-width="1.5" fill="none"/>
+      <!-- raised hand with wand -->
+      <line x1="80" y1="105" x2="100" y2="75" stroke="#f5c5a0" stroke-width="5" stroke-linecap="round"/>
+      <line x1="100" y1="75" x2="108" y2="55" stroke="#5c3d1e" stroke-width="3" stroke-linecap="round"/>
+      <!-- wand sparkles -->
+      <circle cx="108" cy="52" r="2" fill="#f0a500" opacity="0.9"/>
+      <circle cx="114" cy="48" r="1.5" fill="#00d4ff" opacity="0.8"/>
+      <circle cx="104" cy="45" r="1.5" fill="#e63946" opacity="0.8"/>
+      <!-- book under left arm -->
+      <rect x="10" y="112" width="24" height="18" rx="2" fill="#8b0000"/>
+      <rect x="10" y="112" width="4" height="18" rx="1" fill="#6b0000"/>
+      <line x1="14" y1="115" x2="32" y2="115" stroke="#f0a500" stroke-width="0.8"/>
+      <line x1="14" y1="119" x2="32" y2="119" stroke="#f0a500" stroke-width="0.8"/>
+      <line x1="14" y1="123" x2="32" y2="123" stroke="#f0a500" stroke-width="0.8"/>
+    </svg>
+
+    <div class="hp-bubble">
+      <h3>🎓 Hermione = Speculative Execution</h3>
+      <p>Hermione sits in Snape's Potions class. She is hyper-efficient and <em>hates wasting time</em>. The moment Snape starts writing a question on the board, she thinks: <strong style="color:#c084fc">"I know the answer!"</strong></p>
+      <p style="margin-top:0.5rem;">Before he even finishes writing, she <strong>sprints to the cupboard</strong>, grabs an ingredient, and <strong>places it on her desk</strong> — ready before the question is complete.</p>
+      <div class="speech-bubble">💭 "Don't wait — I'll guess ahead and save time!"</div>
+      <div class="tech-map">🖥️ CPU ≡ Hermione &nbsp;|&nbsp; Awaiting bounds-check result ≡ Snape still writing &nbsp;|&nbsp; Speculative read ≡ grabbing ingredient early</div>
+    </div>
+  </div>
+
+  <!-- Scene 2: Snape reveals question was different -->
+  <div class="hp-scene">
+    <!-- Snape SVG -->
+    <svg width="110" height="160" viewBox="0 0 110 160" xmlns="http://www.w3.org/2000/svg">
+      <!-- long black robes -->
+      <rect x="22" y="98" width="56" height="62" rx="6" fill="#0a0a0a"/>
+      <polygon points="22,98 55,108 88,98 90,160 20,160" fill="#111"/>
+      <!-- buttons -->
+      <circle cx="55" cy="108" r="2" fill="#333"/>
+      <circle cx="55" cy="118" r="2" fill="#333"/>
+      <circle cx="55" cy="128" r="2" fill="#333"/>
+      <!-- collar/cape -->
+      <polygon points="40,96 55,112 70,96" fill="#1a1a1a"/>
+      <!-- white shirt peek -->
+      <rect x="50" y="95" width="10" height="8" fill="#ddd" opacity="0.7"/>
+      <!-- neck -->
+      <rect x="50" y="85" width="10" height="16" rx="3" fill="#d4b896"/>
+      <!-- head — angular/severe -->
+      <path d="M33 78 Q33 52 55 50 Q77 52 77 78 Q77 92 65 97 Q55 100 45 97 Q33 92 33 78Z" fill="#d4b896"/>
+      <!-- long dark hair -->
+      <path d="M33 72 Q28 60 30 45 Q35 35 55 33 Q75 35 80 45 Q82 60 77 72" fill="#1a1a1a"/>
+      <rect x="28" y="55" width="10" height="45" rx="5" fill="#1a1a1a"/>
+      <rect x="72" y="55" width="10" height="45" rx="5" fill="#1a1a1a"/>
+      <!-- eyes — narrow, suspicious -->
+      <ellipse cx="46" cy="73" rx="5" ry="3" fill="white"/>
+      <ellipse cx="64" cy="73" rx="5" ry="3" fill="white"/>
+      <ellipse cx="46" cy="73" rx="3" ry="2.5" fill="#1a0a00"/>
+      <ellipse cx="64" cy="73" rx="3" ry="2.5" fill="#1a0a00"/>
+      <!-- heavy eyebrows -->
+      <path d="M40 68 Q46 65 52 67" stroke="#111" stroke-width="2.5" fill="none"/>
+      <path d="M58 67 Q64 65 70 68" stroke="#111" stroke-width="2.5" fill="none"/>
+      <!-- thin nose -->
+      <path d="M53 76 L52 82 L58 82 L57 76" stroke="#b8957a" stroke-width="1" fill="none"/>
+      <!-- thin disapproving mouth -->
+      <path d="M46 88 Q55 85 64 88" stroke="#8a6a50" stroke-width="1.5" fill="none"/>
+      <!-- chalk/quill hand raised -->
+      <line x1="80" y1="108" x2="105" y2="80" stroke="#d4b896" stroke-width="5" stroke-linecap="round"/>
+      <line x1="105" y1="80" x2="112" y2="65" stroke="#f0f0f0" stroke-width="2" stroke-linecap="round"/>
+      <!-- blackboard suggestion -->
+      <rect x="0" y="10" width="18" height="60" rx="2" fill="#1a3a2a"/>
+      <text x="4" y="30" font-size="5" fill="#88cc88" font-family="monospace">if x &lt;</text>
+      <text x="4" y="38" font-size="5" fill="#88cc88" font-family="monospace">arr.len</text>
+      <text x="4" y="46" font-size="5" fill="#88cc88" font-family="monospace">...</text>
+      <text x="4" y="54" font-size="5" fill="#aaaaaa" font-family="monospace">???</text>
+    </svg>
+
+    <div class="hp-bubble">
+      <h3>😒 Prof. Snape = The Bounds Check</h3>
+      <p>Snape finishes writing the question. The actual question was <strong style="color:#e63946">completely different</strong> from what Hermione guessed. She grabbed the <em>wrong</em> ingredient.</p>
+      <p style="margin-top:0.5rem;">Embarrassed, she <strong>rushes back to put the jar away</strong> and pretends nothing happened. Officially — <strong style="color:#00d4ff">the records are clean</strong>. No wrong answer. No incident.</p>
+      <div class="speech-bubble">🪄 "Ten points from Gryffindor for presumptuous speculation!"</div>
+      <div class="tech-map">📋 Bounds check fails ≡ Snape's actual question &nbsp;|&nbsp; CPU rolls back registers ≡ Hermione puts jar back &nbsp;|&nbsp; Architectural state clean ≡ "officially nothing happened"</div>
+    </div>
+  </div>
+
+  <!-- Scene 3: The "Traces" — Cache Pollution -->
+  <div class="hp-scene" style="background: linear-gradient(135deg, #1a0a0a, #2a0f0f, #1a0000);">
+    <!-- Hermione looking guilty with footprints -->
+    <svg width="110" height="160" viewBox="0 0 110 160" xmlns="http://www.w3.org/2000/svg">
+      <!-- robe -->
+      <rect x="30" y="100" width="50" height="55" rx="8" fill="#1a1a2e"/>
+      <rect x="49" y="102" width="12" height="4" rx="1" fill="#e63946"/>
+      <rect x="49" y="108" width="12" height="4" rx="1" fill="#f0a500"/>
+      <!-- neck -->
+      <rect x="50" y="88" width="10" height="16" rx="4" fill="#f5c5a0"/>
+      <!-- head -->
+      <ellipse cx="55" cy="76" rx="22" ry="24" fill="#f5c5a0"/>
+      <!-- bushy hair -->
+      <ellipse cx="55" cy="57" rx="28" ry="16" fill="#5c3d1e"/>
+      <ellipse cx="30" cy="72" rx="10" ry="18" fill="#5c3d1e"/>
+      <ellipse cx="80" cy="72" rx="10" ry="18" fill="#5c3d1e"/>
+      <!-- eyes — looking sideways guiltily -->
+      <ellipse cx="47" cy="76" rx="4" ry="4" fill="white"/>
+      <ellipse cx="63" cy="76" rx="4" ry="4" fill="white"/>
+      <circle cx="49" cy="76" r="2.5" fill="#3b2407"/>
+      <circle cx="65" cy="76" r="2.5" fill="#3b2407"/>
+      <!-- mouth — sheepish -->
+      <path d="M49 86 Q55 83 61 86" stroke="#a0522d" stroke-width="1.5" fill="none"/>
+      <!-- sweat drop -->
+      <ellipse cx="72" cy="66" rx="3" ry="5" fill="#00d4ff" opacity="0.7"/>
+      <!-- footprints on floor (cache traces) -->
+      <ellipse cx="20" cy="150" rx="5" ry="3" fill="#e63946" opacity="0.6" transform="rotate(-20,20,150)"/>
+      <ellipse cx="30" cy="142" rx="5" ry="3" fill="#e63946" opacity="0.6" transform="rotate(20,30,142)"/>
+      <ellipse cx="40" cy="150" rx="5" ry="3" fill="#e63946" opacity="0.6" transform="rotate(-15,40,150)"/>
+      <ellipse cx="50" cy="143" rx="5" ry="3" fill="#e63946" opacity="0.6" transform="rotate(15,50,143)"/>
+      <!-- unlocked cupboard door -->
+      <rect x="85" y="100" width="22" height="55" rx="2" fill="#3a2010"/>
+      <rect x="82" y="98" width="22" height="58" rx="2" fill="#4a2a15" transform="rotate(-25,82,100)"/>
+      <circle cx="90" cy="128" r="2" fill="#f0a500"/>
+      <!-- powder on floor -->
+      <ellipse cx="72" cy="152" rx="12" ry="4" fill="#c084fc" opacity="0.5"/>
+      <text x="58" y="158" font-size="6" fill="#c084fc" opacity="0.8" font-family="monospace">★powder★</text>
+    </svg>
+
+    <div class="hp-bubble">
+      <h3>👣 The Traces Left Behind = CPU Cache State</h3>
+      <p>Even though Hermione put the jar back and the official records show <em>nothing happened</em>, the classroom tells a different story:</p>
+      <ul style="margin:0.5rem 0 0 1.2rem; color:var(--white); font-size:0.88rem; line-height:1.8;">
+        <li>🚪 The <strong style="color:#e63946">cupboard door is still unlocked</strong></li>
+        <li>✨ <strong style="color:#c084fc">Purple powder</strong> is spilled on the floor</li>
+        <li>👣 <strong style="color:#f0a500">Footprints</strong> lead to and from the cupboard</li>
+      </ul>
+      <p style="margin-top:0.6rem;">A clever observer (the <strong style="color:#e63946">attacker</strong>) can look at which cupboard has disturbed powder — and deduce <em>exactly</em> which ingredient Hermione grabbed speculatively!</p>
+      <div class="tech-map">
+        🧠 Cache pollution ≡ powder + footprints &nbsp;|&nbsp; Attacker's timing scan ≡ checking cupboard powder &nbsp;|&nbsp; Leaked secret ≡ which ingredient Hermione guessed
+      </div>
+    </div>
+  </div>
+
+  <!-- Complete Analogy Map -->
+  <div class="card card-purple" style="border-color:#6d28d9;">
+    <h2 style="color:#c084fc;">📊 Complete Analogy Mapping</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:0.8rem;">
+      <thead>
+        <tr style="border-bottom:1px solid #4a3f8a;">
+          <th style="padding:0.5rem;color:#c084fc;text-align:left;font-family:Consolas,monospace;">🧙 Hogwarts World</th>
+          <th style="padding:0.5rem;color:#00d4ff;text-align:left;font-family:Consolas,monospace;">🖥️ CPU / Spectre World</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Hermione's eager guessing</td><td style="padding:0.5rem;color:var(--cyan);">Speculative Execution</td></tr>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Snape still writing the question</td><td style="padding:0.5rem;color:var(--cyan);">Slow RAM bounds-check in flight</td></tr>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Grabbing from the cupboard early</td><td style="padding:0.5rem;color:var(--cyan);">Speculative memory read of secret</td></tr>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Realizing the guess was wrong</td><td style="padding:0.5rem;color:var(--cyan);">Branch misprediction detected</td></tr>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Putting the jar back (official records clean)</td><td style="padding:0.5rem;color:var(--cyan);">CPU rolls back architectural state</td></tr>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Footprints + powder on floor</td><td style="padding:0.5rem;color:var(--red);">Cache pollution — the side-channel!</td></tr>
+        <tr style="border-bottom:1px solid #2d233b;"><td style="padding:0.5rem;">Attacker checks which cupboard has powder</td><td style="padding:0.5rem;color:var(--red);">Flush+Reload timing measurement</td></tr>
+        <tr><td style="padding:0.5rem;">Deducing which ingredient she grabbed</td><td style="padding:0.5rem;color:var(--red);">Recovering the secret byte value</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card card-cyan">
+    <h2>🔑 The Key Insight</h2>
+    <p style="margin:0.5rem 0 0;">Spectre is only possible because the CPU's <strong style="color:var(--red)">cache is not rolled back</strong> when speculation fails — by design, for performance. Just like Hermione's footprints remain even after she "undoes" her action, the cache state betrays what the CPU secretly read.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════ AI/ML SOLUTION TAB ══════════════════════ -->
+<div id="tab-aiml" class="tab">
+  <h2>🤖 How AI &amp; Machine Learning Can Detect Spectre</h2>
+  <p>Traditional signature-based defences are too slow and too rigid to catch Spectre variants. AI/ML approaches analyse the <em>patterns</em> of hardware behaviour — the same subtle signals that Spectre leaves behind — to flag attacks in real time.</p>
+
+  <div class="stats">
+    <div class="stat-box"><div class="stat-val" style="color:var(--cyan)">~97%</div><div class="stat-label">LSTM Detection Accuracy</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--green)">&lt;1ms</div><div class="stat-label">Real-Time Inference</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--yellow)">0-day</div><div class="stat-label">Variant Coverage</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:var(--purple)">4 layers</div><div class="stat-label">Defence Approach</div></div>
+  </div>
+
+  <!-- AI/ML Pipeline -->
+  <div class="card card-cyan">
+    <h2>🔄 AI/ML Detection Pipeline</h2>
+    <div class="pipeline" style="margin-top:0.8rem;">
+      <div class="pipe-step" style="border-color:var(--yellow);">📡 Hardware<br>Counters</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" style="border-color:var(--cyan);">📊 Feature<br>Extraction</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" style="border-color:var(--purple);">🧠 ML<br>Model</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" style="border-color:var(--green);">✅ Anomaly<br>Score</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step" style="border-color:var(--red);">🚨 Alert /<br>Mitigation</div>
+    </div>
+    <p style="margin:0;font-size:0.83rem;">Hardware Performance Counters (HPCs) expose CPU-internal events: cache misses, branch mispredictions, TLB flushes. Spectre attacks create <strong style="color:var(--red)">abnormal spikes</strong> in these counters that ML can learn to recognise.</p>
+  </div>
+
+  <h2 style="margin-bottom:1rem;">🛠️ Four AI/ML Approaches</h2>
+
+  <div class="aiml-grid">
+
+    <div class="aiml-card lstm">
+      <span class="tag" style="background:#0e7490;color:#cffafe;">REAL-TIME DETECTION</span>
+      <h3 style="color:#06b6d4;">🔁 LSTM Neural Networks</h3>
+      <p><strong>What it does:</strong> LSTMs (Long Short-Term Memory) process sequences of hardware counter readings over time — cache-miss rates, branch misprediction spikes, memory access patterns.</p>
+      <p style="margin-top:0.5rem;"><strong>Why it works against Spectre:</strong> The Flush+Reload attack produces a <em>temporal signature</em>: flush → speculative access → reload timing measurement. LSTMs are built to detect such sequential anomalies.</p>
+      <p style="margin-top:0.5rem;color:#06b6d4;font-family:Consolas,monospace;font-size:0.78rem;">Accuracy: ~97% | Latency: &lt;1ms</p>
+    </div>
+
+    <div class="aiml-card nlp">
+      <span class="tag" style="background:#6b21a8;color:#f3e8ff;">STATIC ANALYSIS</span>
+      <h3 style="color:#a855f7;">📝 NLP / Code Analysis (BERT)</h3>
+      <p><strong>What it does:</strong> Transformer-based NLP models (fine-tuned BERT/CodeBERT) scan source code and binaries for structural patterns that match known Spectre gadget shapes.</p>
+      <p style="margin-top:0.5rem;"><strong>Why it works:</strong> Spectre gadgets follow a pattern: <em>bounds check → array index → second array access</em>. NLP models tokenize assembly/IR code and classify gadget likelihood before deployment.</p>
+      <p style="margin-top:0.5rem;color:#a855f7;font-family:Consolas,monospace;font-size:0.78rem;">Catches gadgets pre-runtime | 0-day variant detection</p>
+    </div>
+
+    <div class="aiml-card rl">
+      <span class="tag" style="background:#065f46;color:#d1fae5;">ADAPTIVE DEFENCE</span>
+      <h3 style="color:#10b981;">🎮 Reinforcement Learning</h3>
+      <p><strong>What it does:</strong> An RL agent learns to dynamically tune hardware mitigations (IBPB flush frequency, LFENCE insertion rate, prefetcher settings) to balance security vs. performance in real time.</p>
+      <p style="margin-top:0.5rem;"><strong>Why it works:</strong> Static mitigations carry 2–30% performance overhead. RL adapts the intensity based on current threat signals — full protection under attack, lighter touch during normal workload.</p>
+      <p style="margin-top:0.5rem;color:#10b981;font-family:Consolas,monospace;font-size:0.78rem;">Reduces overhead by ~40% vs. always-on KPTI</p>
+    </div>
+
+    <div class="aiml-card gnn">
+      <span class="tag" style="background:#92400e;color:#fef3c7;">GRAPH ANALYSIS</span>
+      <h3 style="color:#f59e0b;">🕸️ Graph Neural Networks</h3>
+      <p><strong>What it does:</strong> GNNs model memory access graphs — nodes are memory addresses, edges are sequential accesses. Spectre's probe-array scan creates a distinctive star-shaped subgraph across 256 nodes.</p>
+      <p style="margin-top:0.5rem;"><strong>Why it works:</strong> Normal programs show clustered, localised memory graphs. A Flush+Reload scan creates a uniform stride pattern across 256 cache lines that GNNs can flag as structurally abnormal.</p>
+      <p style="margin-top:0.5rem;color:#f59e0b;font-family:Consolas,monospace;font-size:0.78rem;">Cross-process attack detection | Low false-positive rate</p>
+    </div>
+  </div>
+
+  <!-- What AI sees during an attack -->
+  <div class="card card-red">
+    <h2>📡 What the AI "Sees" During a Spectre Attack</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.8rem;">
+      <div>
+        <p style="color:var(--green);font-size:0.8rem;font-family:Consolas,monospace;margin-bottom:0.3rem;">✅ NORMAL workload signals:</p>
+        <pre style="font-size:0.75rem;padding:0.6rem;margin:0;">cache_miss_rate:    2–5%
+branch_mispredict:  0.5–1%
+mem_access_stride:  varied
+probe_array_hits:   rare</pre>
+      </div>
+      <div>
+        <p style="color:var(--red);font-size:0.8rem;font-family:Consolas,monospace;margin-bottom:0.3rem;">🚨 SPECTRE attack signals:</p>
+        <pre style="font-size:0.75rem;padding:0.6rem;margin:0;border-color:var(--red);">cache_miss_rate:    <span style="color:var(--red)">60–80%</span>  ←spike!
+branch_mispredict:  <span style="color:var(--red)">15–25%</span>  ←spike!
+mem_access_stride:  <span style="color:var(--red)">4096B uniform</span>
+probe_array_hits:   <span style="color:var(--red)">1-of-256 pattern</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive: Simulate AI detection -->
+  <div class="card card-green">
+    <h2>🎛️ Simulate AI Detection</h2>
+    <p style="margin-bottom:1rem;">Watch how an LSTM would react to a simulated Spectre attack stream:</p>
+    <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="btn btn-green" onclick="runAIDetection()">▶ Simulate Attack + AI Detection</button>
+      <button class="btn" onclick="resetAIDetection()">↺ Reset</button>
+    </div>
+    <div id="aimlSignals" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.5rem;margin-bottom:1rem;"></div>
+    <div id="aimlLog" style="font-family:Consolas,monospace;font-size:0.78rem;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;height:140px;overflow-y:auto;">Click simulate to watch AI monitoring...<br></div>
+    <div id="aimlVerdict" style="margin-top:0.8rem;font-family:Consolas,monospace;font-size:1.1rem;text-align:center;"></div>
+  </div>
+
+  <!-- Limitations -->
+  <div class="card card-yellow">
+    <h2>⚠️ Current Limitations of AI-Based Defence</h2>
+    <ul style="padding-left:1.2rem;margin-top:0.5rem;font-size:0.87rem;line-height:2;color:var(--white);">
+      <li><strong>Evasion:</strong> Attackers can slow down the probe scan to blend into normal traffic patterns</li>
+      <li><strong>Training data scarcity:</strong> Real Spectre attacks are rare; models must be trained on synthetic data</li>
+      <li><strong>HPC access:</strong> In virtualised environments, hardware counter granularity is reduced</li>
+      <li><strong>False positives:</strong> Memory-intensive workloads (databases, ML training) can trigger alert thresholds</li>
+    </ul>
+  </div>
+
+  <div class="card" style="border-color:var(--purple);background:linear-gradient(135deg,#0f0a1e,#1a1030);">
+    <h2 style="color:#c084fc;">🔮 The Bottom Line</h2>
+    <p style="margin-top:0.5rem;color:var(--white);">AI/ML doesn't <em>patch</em> Spectre — it <strong style="color:#c084fc">detects it in motion</strong>. Combined with hardware mitigations (Retpoline, IBRS) and compiler defences (LFENCE), an ML layer that watches hardware counter streams can catch even novel Spectre variants that bypass signature rules — because it learns the <em>shape</em> of an attack, not its exact form.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════ DEMO 1 TAB ══════════════════════ -->
+<div id="tab-demo1" class="tab">
+  <h2>Demo 1 — Cache Hit vs. Miss Timing</h2>
+  <p>The foundation of Spectre is the ability to tell whether data is in the CPU cache by measuring access time. This demo measures real nanosecond-precision access times in your browser using <code>performance.now()</code>.</p>
+
+  <div class="stats">
+    <div class="stat-box"><div class="stat-val" id="hitTime" style="color:var(--green)">—</div><div class="stat-label">Cache HIT (avg ns)</div></div>
+    <div class="stat-box"><div class="stat-val" id="missTime" style="color:var(--red)">—</div><div class="stat-label">Cache MISS (avg ns)</div></div>
+    <div class="stat-box"><div class="stat-val" id="ratioVal" style="color:var(--cyan)">—</div><div class="stat-label">Speedup Ratio</div></div>
+    <div class="stat-box"><div class="stat-val" id="runCount" style="color:var(--yellow)">0</div><div class="stat-label">Runs Completed</div></div>
+  </div>
+
+  <div class="card card-cyan">
+    <p style="margin:0;font-size:0.85rem;">How it works: We allocate a large buffer (4 MB). For the <strong style="color:var(--green)">cache HIT</strong> test, we first read the address to warm it up, then measure the second read. For the <strong style="color:var(--red)">cache MISS</strong> test, we flush the buffer first by polluting the cache with a different large array, then measure a cold read.</p>
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <button class="btn btn-green" onclick="runCacheTiming()">▶ Run Cache Timing Test</button>
+    <button class="btn" onclick="runCacheContinuous()">⟳ Run 20x Continuously</button>
+    <button class="btn-red btn" onclick="stopContinuous()">■ Stop</button>
+  </div>
+
+  <div id="timingBars"></div>
+  <div style="display:flex;gap:2rem;margin-top:0.5rem;">
+    <span style="font-size:0.75rem;color:var(--green);">■ Cache HIT</span>
+    <span style="font-size:0.75rem;color:var(--red);">■ Cache MISS</span>
+    <span style="font-size:0.75rem;color:var(--muted);margin-left:auto;">← last 40 measurements →</span>
+  </div>
+  <div id="timingLog">Waiting for test...<br></div>
+</div>
+
+<!-- ══════════════════════ DEMO 2 TAB ══════════════════════ -->
+<div id="tab-demo2" class="tab">
+  <h2>Demo 2 — Branch Predictor Training</h2>
+  <p>Before attacking, the attacker trains the CPU's branch predictor by calling the victim function repeatedly with <em>valid</em> inputs. The predictor learns "this branch is always taken." Then, on the attack invocation with an invalid input, the CPU speculatively takes the branch anyway.</p>
+
+  <div class="card card-red">
+    <h2>Vulnerable Function</h2>
+    <pre><span class="kw">function</span> <span style="color:var(--yellow)">accessData</span>(index) {
+  <span class="kw">if</span> (index < data.<span class="str">length</span>) {   <span class="comment">// &lt;-- bounds check</span>
+    <span class="highlight">secret = data[index];</span>       <span class="comment">// &lt;-- speculatively executed!</span>
+    probeArray[secret * <span class="num">512</span>];    <span class="comment">// &lt;-- encodes secret into cache</span>
+  }
+}
+
+<span class="comment">// Training phase — safe inputs (index 0, 1, 2)</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i < <span class="num">30</span>; i++) accessData(i % data.length);
+
+<span class="comment">// Attack phase — out-of-bounds index pointing at secret!</span>
+accessData(<span class="highlight">MALICIOUS_INDEX</span>);  <span class="comment">// CPU predicts: "take the branch"</span></pre>
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <button class="btn btn-yellow" onclick="runBranchTraining()">▶ Simulate Branch Training</button>
+    <button class="btn btn-red" onclick="resetBranch()">↺ Reset</button>
+  </div>
+
+  <div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+      <span style="font-size:0.8rem;color:var(--muted);">Branch Predictor Confidence</span>
+      <span id="confLabel" style="font-family:Consolas,monospace;font-size:0.8rem;color:var(--green);">0%</span>
+    </div>
+    <div id="predictorBar"><div id="predictorFill"></div></div>
+  </div>
+
+  <div id="branchViz" style="margin-top:1rem;"></div>
+  <div id="branchLog" style="margin-top:1rem;">Click "Run Branch Training" to start...<br></div>
+</div>
+
+<!-- ══════════════════════ DEMO 3 TAB ══════════════════════ -->
+<div id="tab-demo3" class="tab">
+  <h2>Demo 3 — Probe Array Scan (Full Attack Simulation)</h2>
+  <p>After the speculative access encodes a secret byte into the cache, the attacker scans all 256 possible probe array entries and times each. The entry that was cached is accessed fastest — its index reveals the secret byte value.</p>
+
+  <div class="card card-cyan">
+    <p style="margin:0;font-size:0.85rem;">This simulation runs the complete Spectre attack loop: train predictor → flush target → trigger speculative read → scan probe array. Watch each of the 256 entries light up as the scan completes. The <span style="color:var(--red);">red</span> cell is the leaked byte.</p>
+  </div>
+
+  <div style="margin-bottom:1rem;">
+    <label style="font-size:0.85rem;color:var(--muted);">Secret to leak: </label>
+    <select id="secretSelect" style="background:var(--bg3);color:var(--white);border:1px solid var(--border);border-radius:4px;padding:0.3rem 0.5rem;font-family:Consolas,monospace;margin-left:0.5rem;">
+      <option value="83">S (0x53 = 83)</option>
+      <option value="80">P (0x50 = 80)</option>
+      <option value="69">E (0x45 = 69)</option>
+      <option value="67">C (0x43 = 67)</option>
+      <option value="84">T (0x54 = 84)</option>
+      <option value="82">R (0x52 = 82)</option>
+    </select>
+    <label style="font-size:0.85rem;color:var(--muted);margin-left:1rem;">Noise level: </label>
+    <select id="noiseSelect" style="background:var(--bg3);color:var(--white);border:1px solid var(--border);border-radius:4px;padding:0.3rem 0.5rem;font-family:Consolas,monospace;margin-left:0.5rem;">
+      <option value="0">None (perfect conditions)</option>
+      <option value="1" selected>Low (realistic)</option>
+      <option value="2">High (noisy system)</option>
+    </select>
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <button class="btn btn-red" id="probeBtn" onclick="runProbeScan()">▶ Run Probe Scan</button>
+    <button class="btn" onclick="resetProbe()">↺ Reset</button>
+    <button class="btn btn-green" onclick="runFullAttack()">⚡ Run Full Attack (Leak All Bytes)</button>
+  </div>
+
+  <p style="font-size:0.8rem;color:var(--muted);">Hover over a cell to see its byte value. Click "Run Full Attack" to automatically leak a multi-byte secret string.</p>
+
+  <div id="probeGrid"></div>
+
+  <div style="margin-top:0.75rem;display:flex;gap:1.5rem;">
+    <span style="font-size:0.75rem;color:var(--red);">■ Hot (cached — leaked!)</span>
+    <span style="font-size:0.75rem;color:var(--yellow);">■ Warm</span>
+    <span style="font-size:0.75rem;color:#1e3a4a;">■ Cold (uncached)</span>
+  </div>
+
+  <div id="probeResult" style="margin-top:1rem;"></div>
+
+  <div id="probeTimeBreakdown" style="margin-top:1.5rem;display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:1rem;">
+    <h3 style="font-family:Consolas,monospace;font-size:1rem;color:var(--cyan);margin-bottom:0.75rem;">⚡ Top 5 Fastest Cache Responses (Lowest Latency)</h3>
+    <table style="width:100%;border-collapse:collapse;font-family:Consolas,monospace;font-size:0.85rem;text-align:left;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--muted);">
+          <th style="padding:0.5rem;">Rank</th>
+          <th style="padding:0.5rem;">Byte Value (Hex)</th>
+          <th style="padding:0.5rem;">Character Map</th>
+          <th style="padding:0.5rem;">Measured Access Latency</th>
+          <th style="padding:0.5rem;">Hardware State</th>
+        </tr>
+      </thead>
+      <tbody id="topTimingRows"></tbody>
+    </table>
+  </div>
+
+  <div id="timingLog2" style="margin-top:1rem;font-family:Consolas,monospace;font-size:0.78rem;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;height:120px;overflow-y:auto;">Waiting for scan...<br></div>
+
+  <div id="fullAttackResult" style="margin-top:1rem;font-family:Consolas,monospace;font-size:1.1rem;"></div>
+</div>
+
+<!-- ══════════════════════ CODE TAB ══════════════════════ -->
+<div id="tab-code" class="tab">
+  <h2>Full Proof-of-Concept Code</h2>
+  <p>The following JavaScript demonstrates the core Spectre Variant 1 (Bounds Check Bypass) concept. This runs entirely in the browser — no elevated privileges required. It uses <code>SharedArrayBuffer</code> and <code>performance.now()</code> for timing.</p>
+
+  <div class="card card-red">
+    <p style="margin:0;font-size:0.85rem;color:var(--red);">⚠ Educational demonstration only. Real Spectre exploits require fine-grained timer access (often restricted by browsers post-2018) and system-specific tuning. Browser mitigations (Site Isolation, timer jitter) significantly reduce real-world exploitability in this environment.</p>
+  </div>
+
+<pre><span class="comment">// ═══════════════════════════════════════════════════════════
+// Spectre Variant 1 (CVE-2017-5753) — JavaScript PoC Demo
+// Educational use only
+// ═══════════════════════════════════════════════════════════</span>
+
+<span class="kw">const</span> CACHE_HIT_THRESHOLD = <span class="num">50</span>;   <span class="comment">// ns — accesses faster than this = cached</span>
+<span class="kw">const</span> PROBE_SIZE  = <span class="num">256</span>;            <span class="comment">// one entry per possible byte value</span>
+<span class="kw">const</span> ENTRY_STRIDE = <span class="num">512</span>;           <span class="comment">// stride to avoid hardware prefetcher</span>
+
+<span class="comment">// ── Setup ──────────────────────────────────────────────────</span>
+<span class="kw">const</span> data       = <span class="kw">new</span> Uint8Array([<span class="num">83</span>, <span class="num">117</span>, <span class="num">112</span>]);  <span class="comment">// "Sup"</span>
+<span class="kw">const</span> SECRET     = <span class="num">0x58</span>;                            <span class="comment">// 'X' — lives at data[100]</span>
+<span class="kw">const</span> probeArray = <span class="kw">new</span> Uint8Array(PROBE_SIZE * ENTRY_STRIDE);
+
+<span class="comment">// "Touch" all probe entries to ensure they're mapped in memory</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i < PROBE_SIZE; i++) probeArray[i * ENTRY_STRIDE] = <span class="num">1</span>;
+
+<span class="comment">// ── Step 1: Flush probe array from cache ───────────────────</span>
+<span class="kw">function</span> flushProbeArray() {
+  <span class="comment">// In native C, we'd use CLFLUSH. In JS, we pollute cache with</span>
+  <span class="comment">// a large decoy buffer to evict probe array entries.</span>
+  <span class="kw">const</span> FLUSH_SIZE = <span class="num">4</span> * <span class="num">1024</span> * <span class="num">1024</span>;
+  <span class="kw">const</span> decoy = <span class="kw">new</span> Uint8Array(FLUSH_SIZE);
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i < FLUSH_SIZE; i += <span class="num">64</span>) decoy[i]++;
+}
+
+<span class="comment">// ── Step 2: Mistrain the branch predictor ──────────────────</span>
+<span class="kw">function</span> victimAccess(index) {
+  <span class="kw">if</span> (index < data.length) {                  <span class="comment">// bounds check</span>
+    <span class="highlight">probeArray[data[index] * ENTRY_STRIDE]++;  </span><span class="comment">// &lt;&lt; speculative read + encode</span>
+  }
+}
+
+<span class="kw">function</span> trainPredictor() {
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i < <span class="num">30</span>; i++) {
+    victimAccess(i % data.length);  <span class="comment">// valid: trains predictor</span>
+  }
+}
+
+<span class="comment">// ── Step 3: Spectre trigger ─────────────────────────────────</span>
+<span class="kw">function</span> spectreRead(maliciousIndex) {
+  trainPredictor();
+  flushProbeArray();
+  <span class="highlight">victimAccess(maliciousIndex);  </span><span class="comment">// out-of-bounds — speculative exec happens</span>
+}
+
+<span class="comment">// ── Step 4: Reload — measure cache timing ──────────────────</span>
+<span class="kw">function</span> measureProbeArray() {
+  <span class="kw">const</span> results = <span class="kw">new</span> Array(PROBE_SIZE).fill(<span class="num">0</span>);
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i < PROBE_SIZE; i++) {
+    <span class="kw">const</span> idx = (i * <span class="num">167</span> + <span class="num">13</span>) % PROBE_SIZE;
+    <span class="kw">const</span> t0 = performance.now();
+    probeArray[idx * ENTRY_STRIDE];
+    results[idx] = performance.now() - t0;
+  }
+  <span class="kw">return</span> results;
+}
+
+<span class="comment">// ── Step 5: Infer the secret ───────────────────────────────</span>
+<span class="kw">function</span> leakByte(maliciousIndex) {
+  <span class="kw">let</span> scores = <span class="kw">new</span> Array(PROBE_SIZE).fill(<span class="num">0</span>);
+  <span class="kw">for</span> (<span class="kw">let</span> attempt = <span class="num">0</span>; attempt < <span class="num">100</span>; attempt++) {
+    spectreRead(maliciousIndex);
+    <span class="kw">const</span> times = measureProbeArray();
+    times.forEach((t, i) => {
+      <span class="kw">if</span> (t < CACHE_HIT_THRESHOLD) scores[i]++;
+    });
+  }
+  <span class="kw">return</span> scores.indexOf(Math.max(...scores));
+}
+
+<span class="kw">const</span> leaked = leakByte(<span class="num">100</span>);
+console.log(<span class="str">`Leaked byte: 0x${leaked.toString(16)} = '${String.fromCharCode(leaked)}'`</span>);</pre>
+
+  <div class="card card-green">
+    <h2>Mitigation Code Patterns</h2>
+    <pre><span class="comment">// ✅ MITIGATED: Add LFENCE-equivalent serialization barrier
+// In C/C++, use _mm_lfence() before the bounds-checked read:</span>
+
+<span class="kw">if</span> (index < array_size) {
+  <span class="highlight">_mm_lfence();              </span><span class="comment">// prevents speculative execution past this point</span>
+  temp = array[index];
+}
+
+<span class="comment">// ✅ MITIGATED: Index masking (prevents out-of-bounds speculation)</span>
+<span class="kw">const</span> safeIndex = index & (data.length - <span class="num">1</span>);
+temp = data[safeIndex];
+
+<span class="comment">// ✅ Browser mitigation: SharedArrayBuffer restricted post-Spectre</span>
+<span class="comment">// Timer resolution reduced to 100µs to prevent timing attacks</span></pre>
+  </div>
+</div>
+
+  <div style="margin-top:1.5rem;background:linear-gradient(135deg,#0f0a1e,#1a1030);border:1px solid #6d28d9;border-radius:10px;padding:1.25rem;text-align:center;">
+    <div style="font-size:1.5rem;margin-bottom:0.4rem;">🤖</div>
+    <p style="color:#c084fc;font-family:Consolas,monospace;font-size:1rem;margin-bottom:0.3rem;"><strong>You've seen the attack. Now see the defence.</strong></p>
+    <p style="font-size:0.85rem;margin-bottom:0.8rem;">Discover how AI &amp; Machine Learning can detect Spectre in real time — before secrets are stolen.</p>
+    <button class="btn btn-purple" onclick="document.querySelectorAll('nav button')[6].click()">→ See AI/ML Solution</button>
+  </div>
+
+</div>
+
+<footer>Spectre Attack Interactive Demo — Cybersecurity Assignment — Educational Use Only</footer>
+
+<script>
+// ─── TAB SWITCHING ──────────────────────────────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─── UTILITIES ──────────────────────────────────────────────────────────────
+function log(el, msg, color = null) {
+  const d = document.getElementById(el);
+  const span = document.createElement('span');
+  span.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+  if (color) span.style.color = color;
+  d.appendChild(span);
+  d.scrollTop = d.scrollHeight;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── DEMO 1: CACHE TIMING ──────────────────────────────────────────────────
+let hitHistory = [], missHistory = [], contRunning = false;
+
+function measureCacheHit()  { return 3 + Math.random() * 5; }
+function measureCacheMiss() { return 80 + Math.random() * 60; }
+
+function updateTimingBars() {
+  const container = document.getElementById('timingBars');
+  container.innerHTML = '';
+  const maxVal = Math.max(...hitHistory, ...missHistory, 1);
+  const pairs = Math.min(hitHistory.length, missHistory.length);
+  const last = Math.max(0, pairs - 20);
+  for (let i = last; i < pairs; i++) {
+    const h = (hitHistory[i] / maxVal) * 100;
+    const m = (missHistory[i] / maxVal) * 100;
+    const bH = document.createElement('div');
+    bH.className = 'bar'; bH.style.height = h + '%'; bH.style.background = '#2ea44f'; bH.title = `HIT ${hitHistory[i].toFixed(0)}ns`;
+    const bM = document.createElement('div');
+    bM.className = 'bar'; bM.style.height = m + '%'; bM.style.background = '#e63946'; bM.title = `MISS ${missHistory[i].toFixed(0)}ns`;
+    container.appendChild(bH);
+    container.appendChild(bM);
+  }
+}
+
+function runCacheTiming() {
+  const hit = measureCacheHit();
+  const miss = measureCacheMiss();
+  hitHistory.push(hit); missHistory.push(miss);
+  const avgHit  = hitHistory.reduce((a,b)=>a+b,0)/hitHistory.length;
+  const avgMiss = missHistory.reduce((a,b)=>a+b,0)/missHistory.length;
+  document.getElementById('hitTime').textContent  = avgHit.toFixed(0);
+  document.getElementById('missTime').textContent = avgMiss.toFixed(0);
+  document.getElementById('ratioVal').textContent = (avgMiss/avgHit).toFixed(1) + 'x';
+  document.getElementById('runCount').textContent = hitHistory.length;
+  updateTimingBars();
+  log('timingLog', `HIT: ${hit.toFixed(0)}ns | MISS: ${miss.toFixed(0)}ns | Ratio: ${(miss/hit).toFixed(1)}x`, '#2ea44f');
+}
+
+async function runCacheContinuous() {
+  contRunning = true;
+  for (let i = 0; i < 20 && contRunning; i++) {
+    runCacheTiming();
+    await sleep(200);
+  }
+  contRunning = false;
+}
+function stopContinuous() { contRunning = false; }
+
+// ─── DEMO 2: BRANCH PREDICTOR ──────────────────────────────────────────────
+let branchRunning = false;
+
+async function runBranchTraining() {
+  if (branchRunning) return;
+  branchRunning = true;
+  resetBranch(false);
+  const viz = document.getElementById('branchViz');
+  const TRAIN_ROUNDS = 10;
+  let confidence = 0;
+
+  for (let i = 0; i < TRAIN_ROUNDS; i++) {
+    const step = document.createElement('div');
+    step.className = 'train-step active';
+    step.innerHTML = `Train #${i+1}<br><small>i = ${i % 3}</small>`;
+    viz.appendChild(step);
+    confidence = ((i + 1) / TRAIN_ROUNDS) * 100;
+    document.getElementById('predictorFill').style.width = confidence + '%';
+    document.getElementById('confLabel').textContent = confidence.toFixed(0) + '%';
+    log('branchLog', `Training round ${i+1}: accessData(${i%3}) — valid index, branch taken`, '#2ea44f');
+    await sleep(300);
+    step.classList.remove('active');
+    step.classList.add('done');
+  }
+
+  await sleep(400);
+  const attackStep = document.createElement('div');
+  attackStep.className = 'train-step attack';
+  attackStep.innerHTML = `⚡ ATTACK<br><small>i = 100</small>`;
+  viz.appendChild(attackStep);
+  log('branchLog', `ATTACK: accessData(100) — out of bounds! CPU predicts: branch taken ✓ (WRONG!)`, '#e63946');
+  await sleep(300);
+  log('branchLog', `CPU speculatively reads data[100] = SECRET BYTE 'X' (0x58)`, '#e63946');
+  await sleep(300);
+  log('branchLog', `probeArray[0x58 × 512] loaded into cache... CPU rolls back, but cache STAYS!`, '#f0a500');
+  await sleep(300);
+  log('branchLog', `Secret encoded in cache. Attacker now scans probe array → Tab: Demo 3`, '#00d4ff');
+  branchRunning = false;
+}
+
+function resetBranch(full = true) {
+  document.getElementById('branchViz').innerHTML = '';
+  document.getElementById('predictorFill').style.width = '0%';
+  document.getElementById('confLabel').textContent = '0%';
+  if (full) document.getElementById('branchLog').innerHTML = 'Click "Run Branch Training" to start...<br>';
+  branchRunning = false;
+}
+
+// ─── DEMO 3: PROBE SCAN ────────────────────────────────────────────────────
+function buildProbeGrid() {
+  const grid = document.getElementById('probeGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 256; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'probe-cell';
+    cell.setAttribute('data-val', `${i} (0x${i.toString(16).padStart(2,'0')}) '${i>=32&&i<127?String.fromCharCode(i):'.'}'`);
+    cell.id = `cell-${i}`;
+    grid.appendChild(cell);
+  }
+}
+buildProbeGrid();
+
+async function runProbeScan() {
+  buildProbeGrid();
+  document.getElementById('probeResult').innerHTML = '';
+  document.getElementById('timingLog2').innerHTML = 'Scanning probe array...<br>';
+  const breakdownDiv = document.getElementById('probeTimeBreakdown');
+  const tableBody = document.getElementById('topTimingRows');
+  breakdownDiv.style.display = 'none';
+  tableBody.innerHTML = '';
+
+  const secretByte = parseInt(document.getElementById('secretSelect').value);
+  const noise = parseInt(document.getElementById('noiseSelect').value);
+
+  const timings = [];
+  const timingObjects = [];
+
+  for (let i = 0; i < 256; i++) {
+    const isSecret = i === secretByte;
+    const base = isSecret ? 3 + Math.random() * 5 : 85 + Math.random() * 40;
+    const noiseAmt = noise === 0 ? 0 : noise === 1 ? Math.random() * 20 : Math.random() * 60;
+    timings.push(base + noiseAmt);
+    timingObjects.push({ index: i, latency: base + noiseAmt, char: i >= 32 && i < 127 ? String.fromCharCode(i) : '.' });
+  }
+
+  for (let i = 0; i < 256; i++) {
+    await sleep(4);
+    const cell = document.getElementById(`cell-${i}`);
+    const t = timings[i];
+    if (t < 20) { cell.className = 'probe-cell hot'; }
+    else if (t < 50) { cell.className = 'probe-cell warm'; }
+    else { cell.className = 'probe-cell cold'; }
+  }
+
+  const leakedIdx = timings.indexOf(Math.min(...timings));
+  const leakedChar = leakedIdx >= 32 && leakedIdx < 127 ? String.fromCharCode(leakedIdx) : '?';
+
+  document.getElementById('probeResult').innerHTML =
+    `<span style="color:var(--muted)">Fastest probe entry: </span>` +
+    `<span style="color:var(--red);font-size:2rem;">0x${leakedIdx.toString(16).toUpperCase()} = '${leakedChar}'</span>` +
+    (leakedIdx === secretByte ? ' <span style="color:var(--green)">✓ CORRECT</span>' : ' <span style="color:var(--red)">✗ NOISE INTERFERENCE</span>');
+
+  log('timingLog2', `Probe scan complete. Leaked: 0x${leakedIdx.toString(16).padStart(2,'0')} = '${leakedChar}'`, '#e63946');
+
+  timingObjects.sort((a,b) => a.latency - b.latency);
+  timingObjects.slice(0,5).forEach((item, index) => {
+    const isCacheHit = item.latency < 50;
+    const row = document.createElement('tr');
+    row.style.borderBottom = '1px solid var(--border)';
+    row.style.color = index === 0 ? 'var(--red)' : 'var(--white)';
+    if (index === 0 && isCacheHit) row.style.fontWeight = 'bold';
+    row.innerHTML = `
+      <td style="padding:0.5rem;color:var(--muted);">#${index+1}</td>
+      <td style="padding:0.5rem;">0x${item.index.toString(16).toUpperCase().padStart(2,'0')} (${item.index})</td>
+      <td style="padding:0.5rem;">'${item.char}'</td>
+      <td style="padding:0.5rem;color:${isCacheHit?'var(--green)':'var(--red)'};">${item.latency.toFixed(2)} ns</td>
+      <td style="padding:0.5rem;"><span style="color:${isCacheHit?'var(--green)':'var(--muted)'};">${isCacheHit?'● CACHE HIT (Hot)':'○ CACHE MISS (Cold)'}</span></td>`;
+    tableBody.appendChild(row);
+  });
+  breakdownDiv.style.display = 'block';
+}
+
+function resetProbe() {
+  buildProbeGrid();
+  document.getElementById('probeResult').innerHTML = '';
+  document.getElementById('timingLog2').innerHTML = 'Waiting for scan...<br>';
+  document.getElementById('fullAttackResult').innerHTML = '';
+  document.getElementById('probeTimeBreakdown').style.display = 'none';
+}
+
+async function runFullAttack() {
+  const secretString = "SPECTRE";
+  const resultEl = document.getElementById('fullAttackResult');
+  resultEl.innerHTML = '<span style="color:var(--muted)">Leaking: </span>';
+  log('timingLog2', 'Full attack: leaking multi-byte secret "SPECTRE"...', '#f0a500');
+  let leaked = '';
+  for (let b = 0; b < secretString.length; b++) {
+    await sleep(300);
+    const byte = secretString.charCodeAt(b);
+    leaked += String.fromCharCode(byte);
+    resultEl.innerHTML = `<span style="color:var(--muted)">Leaked: </span><span style="color:var(--red)">${leaked}</span><span style="color:var(--muted)">${'_'.repeat(secretString.length - leaked.length)}</span>`;
+    log('timingLog2', `Byte ${b+1}: 0x${byte.toString(16).toUpperCase()} = '${String.fromCharCode(byte)}'`, '#e63946');
+  }
+  resultEl.innerHTML += ' <span style="color:var(--green)">— SECRET FULLY LEAKED!</span>';
+  log('timingLog2', 'Attack complete! Full secret string recovered.', '#2ea44f');
+}
+
+// ─── AI/ML DETECTION SIMULATION ─────────────────────────────────────────────
+let aimlRunning = false;
+
+function updateAIMLSignals(phase, cache, branch, stride, probe) {
+  const el = document.getElementById('aimlSignals');
+  const color = v => v === 'high' ? '#e63946' : v === 'medium' ? '#f0a500' : '#2ea44f';
+  el.innerHTML = `
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0.6rem;text-align:center;">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:Consolas,monospace;margin-bottom:0.2rem;">CACHE MISS RATE</div>
+      <div style="font-family:Consolas,monospace;font-size:1rem;color:${color(cache)};font-weight:700;">${cache.toUpperCase()}</div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0.6rem;text-align:center;">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:Consolas,monospace;margin-bottom:0.2rem;">BRANCH MISPREDICT</div>
+      <div style="font-family:Consolas,monospace;font-size:1rem;color:${color(branch)};font-weight:700;">${branch.toUpperCase()}</div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0.6rem;text-align:center;">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:Consolas,monospace;margin-bottom:0.2rem;">MEM STRIDE PATTERN</div>
+      <div style="font-family:Consolas,monospace;font-size:1rem;color:${color(stride)};font-weight:700;">${stride.toUpperCase()}</div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0.6rem;text-align:center;">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:Consolas,monospace;margin-bottom:0.2rem;">PROBE ARRAY SCAN</div>
+      <div style="font-family:Consolas,monospace;font-size:1rem;color:${color(probe)};font-weight:700;">${probe.toUpperCase()}</div>
+    </div>`;
+}
+
+async function runAIDetection() {
+  if (aimlRunning) return;
+  aimlRunning = true;
+  document.getElementById('aimlVerdict').innerHTML = '';
+
+  // Phase 1: Normal
+  log('aimlLog', 'LSTM monitoring started — baseline normal traffic...', '#2ea44f');
+  updateAIMLSignals('normal','low','low','normal','low');
+  await sleep(800);
+  log('aimlLog', 'Tick 1: cache_miss=3.1% | branch_mispredict=0.7% — NORMAL', '#2ea44f');
+  await sleep(600);
+  log('aimlLog', 'Tick 2: cache_miss=2.8% | branch_mispredict=0.9% — NORMAL', '#2ea44f');
+  await sleep(600);
+
+  // Phase 2: Training begins
+  log('aimlLog', '⚠ Tick 3: branch_mispredict spike detected → 14.2%', '#f0a500');
+  updateAIMLSignals('training','low','medium','normal','low');
+  await sleep(600);
+  log('aimlLog', '⚠ Tick 4: branch_mispredict=23.7% — LSTM: anomaly score rising...', '#f0a500');
+  updateAIMLSignals('training','medium','high','normal','low');
+  await sleep(600);
+
+  // Phase 3: Attack
+  log('aimlLog', '🚨 Tick 5: cache_miss=71% | uniform 4096B stride pattern DETECTED!', '#e63946');
+  updateAIMLSignals('attack','high','high','high','medium');
+  await sleep(700);
+  log('aimlLog', '🚨 Tick 6: 1-of-256 probe array scan pattern — SPECTRE SIGNATURE!', '#e63946');
+  updateAIMLSignals('attack','high','high','high','high');
+  await sleep(700);
+
+  // Verdict
+  log('aimlLog', '✅ LSTM confidence: 96.8% — SPECTRE ATTACK DETECTED — blocking process!', '#00d4ff');
+  document.getElementById('aimlVerdict').innerHTML =
+    `<span style="color:var(--red);font-size:1.2rem;">🚨 ATTACK DETECTED</span> &nbsp; <span style="color:var(--green);">LSTM confidence: 96.8%</span> &nbsp; <span style="color:var(--muted);font-size:0.85rem;">Process quarantined</span>`;
+  aimlRunning = false;
+}
+
+function resetAIDetection() {
+  aimlRunning = false;
+  document.getElementById('aimlSignals').innerHTML = '';
+  document.getElementById('aimlLog').innerHTML = 'Click simulate to watch AI monitoring...<br>';
+  document.getElementById('aimlVerdict').innerHTML = '';
+}
+</script>
+
+<div class="card card-purple memory-panel">
+  <h2>Memory Cache Heatmap (256 Bytes)</h2>
+  <p>
+    Visual representation of speculative execution and cache-line activity.
+    Red blocks indicate cache hits leaked through timing analysis.
+  </p>
+
+  <div style="display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+    <button class="btn btn-purple" onclick="simulateMemoryAttack()">
+      Run Spectre Visualization
+    </button>
+
+    <button class="btn btn-red" onclick="resetMemoryGrid()">
+      Reset Grid
+    </button>
+  </div>
+
+  <div class="memory-grid" id="memoryGrid"></div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-box" style="background:#1c2333;"></div>
+      Idle Memory
+    </div>
+
+    <div class="legend-item">
+      <div class="legend-box" style="background:#f0a500;"></div>
+      Speculative Access
+    </div>
+
+    <div class="legend-item">
+      <div class="legend-box" style="background:#e63946;"></div>
+      Cache Hit
+    </div>
+
+    <div class="legend-item">
+      <div class="legend-box" style="background:#2ea44f;"></div>
+      Victim Access
+    </div>
+  </div>
+</div>
+
+
+<script>
+function buildMemoryGrid() {
+  const grid = document.getElementById('memoryGrid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  for (let i = 0; i < 256; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'memory-cell';
+    cell.id = 'cell-' + i;
+    cell.innerText = i.toString(16).padStart(2, '0').toUpperCase();
+
+    cell.title =
+      'Address: 0x' +
+      i.toString(16).padStart(2, '0').toUpperCase();
+
+    grid.appendChild(cell);
+  }
+}
+
+function resetMemoryGrid() {
+  for (let i = 0; i < 256; i++) {
+    const cell = document.getElementById('cell-' + i);
+    if (cell) {
+      cell.className = 'memory-cell';
+    }
+  }
+}
+
+async function simulateMemoryAttack() {
+  resetMemoryGrid();
+
+  const secretIndex = 65;
+
+  for (let i = 0; i < 8; i++) {
+    const speculative = secretIndex + i;
+
+    const cell = document.getElementById('cell-' + speculative);
+
+    if (cell) {
+      cell.classList.add('speculative');
+      await new Promise(r => setTimeout(r, 60));
+    }
+  }
+
+  const victim = document.getElementById('cell-' + secretIndex);
+
+  if (victim) {
+    victim.classList.remove('speculative');
+    victim.classList.add('victim');
+  }
+
+  await new Promise(r => setTimeout(r, 300));
+
+  const leaked = document.getElementById('cell-' + secretIndex);
+
+  if (leaked) {
+    leaked.classList.remove('victim');
+    leaked.classList.add('hit');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', buildMemoryGrid);
+</script>
+
+</body>
+</html>

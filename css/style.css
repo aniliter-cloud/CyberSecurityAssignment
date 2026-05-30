@@ -1,0 +1,74 @@
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2333; --bg4: #21262d;
+  --red: #e63946; --cyan: #00d4ff; --green: #2ea44f; --yellow: #f0a500;
+  --white: #f0f6fc; --muted: #8b949e; --border: #2d333b;
+  --purple: #8b5cf6;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--white); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+header { background: var(--bg2); border-bottom: 2px solid var(--red); padding: 1.2rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-family: Consolas, monospace; font-size: 1.4rem; color: var(--white); }
+.accent-text { color: var(--red); }
+span.badge { background: var(--bg4); border: 1px solid var(--border); color: var(--muted); font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 4px; font-family: Consolas, monospace; }
+
+/* Navigation Tab Infrastructure */
+nav.tabs { display: flex; gap: 4px; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 2rem; overflow-x: auto; }
+nav.tabs .tab-btn { background: none; border: none; color: var(--muted); padding: 1rem 1.2rem; cursor: pointer; font-size: 0.9rem; font-family: Consolas, monospace; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }
+nav.tabs .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); background: rgba(0, 212, 255, 0.04); font-weight: bold; }
+nav.tabs .tab-btn:hover { color: var(--white); }
+
+/* Flexible Structural Grids */
+.container { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.grid-sidebar { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; }
+
+.card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.card h2 { font-family: Consolas, monospace; color: var(--cyan); margin-bottom: 1rem; font-size: 1.25rem; }
+.card h3 { font-size: 1rem; color: var(--white); margin-bottom: 1rem; font-family: Consolas, monospace; }
+.card p { color: var(--muted); line-height: 1.6; margin-bottom: 1rem; font-size: 0.95rem; }
+.alert-box-warning { border-left: 4px solid var(--red); background: rgba(230,57,70,0.05); padding: 1rem; border-radius: 4px; margin-top: 1rem; font-size: 0.95rem; color: #ff9e9e; }
+
+/* Component Controls */
+.btn { background: var(--cyan); color: var(--bg); border: none; padding: 0.6rem 1.4rem; border-radius: 4px; cursor: pointer; font-family: Consolas, monospace; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.5rem; }
+.btn-purple { background: var(--purple); color: white; }
+.btn-green { background: var(--green); color: white; }
+.btn-red { background: var(--red); color: white; }
+.btn:hover { opacity: 0.9; }
+
+.form-input { width: 100%; padding: 0.6rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--white); margin-bottom: 1rem; font-family: monospace; }
+.terminal-log { background: #010409; border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; overflow-y: auto; font-family: Consolas, monospace; font-size: 0.8rem; line-height: 1.4; color: #58a6ff; height: 180px; }
+.leak-box { background: var(--bg4); border: 1px solid var(--border); padding: 1rem; border-radius: 6px; }
+.leak-stream { font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: bold; color: var(--red); letter-spacing: 3px; margin-top: 0.2rem; }
+
+/* Interactive State Matrix */
+.matrix-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 4px; background: var(--bg); padding: 10px; border-radius: 6px; border: 1px solid var(--border); }
+.matrix-cell { aspect-ratio: 1; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-family: monospace; font-weight: bold; }
+.matrix-cell.cold { background: #161b22; color: #30363d; }
+.matrix-cell.warm { background: #c69026; color: #fff; box-shadow: 0 0 6px rgba(240,165,0,0.2); }
+.matrix-cell.hot { background: var(--red); color: #fff; box-shadow: 0 0 12px var(--red); transform: scale(1.05); }
+
+.grid-legend { display: flex; gap: 1rem; margin-top: 1rem; justify-content: center; font-size: 0.8rem; color: var(--muted); }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.dot.cold { background: #161b22; }
+.dot.warm { background: #c69026; }
+.dot.hot { background: var(--red); }
+
+/* Simulation Latency Bar Engine */
+.progress-track { width: 100%; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 1rem; }
+.progress-fill { width: 0%; height: 100%; background: var(--purple); transition: width 0.2s; }
+.chart-box { display: flex; flex-direction: column; gap: 10px; }
+.chart-bar-wrapper { display: flex; align-items: center; gap: 10px; }
+.chart-bar-label { width: 120px; text-align: right; font-size: 0.8rem; color: var(--muted); font-family: monospace; }
+.chart-bar-container { flex-grow: 1; height: 24px; background: var(--bg); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); position: relative; }
+.chart-bar-fill { height: 100%; width: 0%; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-family: monospace; font-size: 0.75rem; font-weight: bold; color: white; transition: width 0.4s ease-out; }
+
+/* AI Telemetry Layouts */
+.radar-telemetry { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; margin-bottom: 1rem; }
+.telemetry-pill { background: var(--bg4); border: 1px solid var(--border); padding: 0.6rem; border-radius: 4px; font-family: Consolas, monospace; font-size: 0.8rem; display: flex; justify-content: space-between; }
+.verdict-box { background: var(--bg4); border: 1px solid var(--border); padding: 0.8rem 1rem; border-radius: 4px; margin-top: 1rem; font-family: monospace; display: flex; justify-content: space-between; align-items: center; }
+.verdict-output { font-weight: bold; font-size: 0.95rem; }
