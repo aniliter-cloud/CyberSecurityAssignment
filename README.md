@@ -1,6 +1,6 @@
 # 👻 Spectre Attack — Interactive Demo
 
-> **CVE-2017-5753 · Educational Use Only**
+> **CVE-2017-5753 · Educational/POC Use Only**
 > A fully self-contained HTML demo that walks you through the Spectre microarchitectural attack — from theory and analogy, through live interactive exploitation, to AI/ML-based defence.
 
 ---
@@ -152,4 +152,3 @@ This project is for **educational and research purposes only**. The demos simula
 
 ---
 *Anil Kumar Das - G25AIT2009 \n*
-*Made for Cybersecurity Demonstration — Educational Use Only*

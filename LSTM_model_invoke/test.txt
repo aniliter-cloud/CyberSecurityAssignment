@@ -1,0 +1,7 @@
+#test from terminal
+curl -X POST http://localhost:5000/simulate \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "attack"}'
+
+#health 
+curl http://localhost:5000/health
